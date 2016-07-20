@@ -1,15 +1,4 @@
-/* 
- * patternlab-node - v2.2.1 - 2016 
- * 
- * This file is auto generated - please make changes to core/lib/patternlab-src.js 
- * 
- * Brian Muenzenmeyer, Geoff Pursell, and the web community.
- * Licensed under the MIT license. 
- * 
- * Many thanks to Brad Frost and Dave Olsen for inspiration, encouragement, and advice. 
- *
- */
-
+/* This files is the src for patternlab */
 "use strict";
 
 var diveSync = require('diveSync'),
@@ -75,6 +64,7 @@ var patternlab_engine = function (config) {
     pe = require('./pattern_exporter'),
     lh = require('./lineage_hunter'),
     buildFrontEnd = require('./ui_builder'),
+    he = require('html-entities').AllHtmlEntities,
     plutils = require('./utilities'),
     sm = require('./starterkit_manager'),
     patternlab = {};
@@ -149,7 +139,7 @@ var patternlab_engine = function (config) {
     // references. This happens specifically with the Handlebars engine. Remove
     // if you like 180MB log files.
     function propertyStringReplacer(key, value) {
-      if (key === 'engine' && value && value.engineName) {
+      if (key === 'engine' && value.engineName) {
         return '{' + value.engineName + ' engine object}';
       }
       return value;
@@ -208,13 +198,13 @@ var patternlab_engine = function (config) {
       process.exit(1);
     }
     patternlab.patterns = [];
-    patternlab.subtypePatterns = {};
     patternlab.partials = {};
     patternlab.data.link = {};
 
     setCacheBust();
 
     var pattern_assembler = new pa(),
+      entity_encoder = new he(),
       pattern_exporter = new pe(),
       lineage_hunter = new lh(),
       patterns_dir = paths.source.patterns;
@@ -277,10 +267,6 @@ var patternlab_engine = function (config) {
     //render all patterns last, so lineageR works
     patternlab.patterns.forEach(function (pattern) {
 
-      if (!pattern.isPattern) {
-        return false;
-      }
-
       pattern.header = head;
 
       //todo move this into lineage_hunter
@@ -299,15 +285,15 @@ var patternlab_engine = function (config) {
         console.log(err);
       }
       allData = plutils.mergeData(allData, pattern.jsonFileData);
-      allData.cacheBuster = patternlab.cacheBuster;
 
+      //var headHTML = pattern_assembler.renderPattern(patternlab.userHead, allData);
       var headHTML = pattern_assembler.renderPattern(pattern.header, allData);
 
       //render the extendedTemplate with all data
       pattern.patternPartialCode = pattern_assembler.renderPattern(pattern, allData);
 
       //todo see if this is still needed
-      //pattern.patternPartialCodeE = entity_encoder.encode(pattern.patternPartialCode);
+      pattern.patternPartialCodeE = entity_encoder.encode(pattern.patternPartialCode);
 
       // stringify this data for individual pattern rendering and use on the styleguide
       // see if patternData really needs these other duped values
@@ -338,7 +324,7 @@ var patternlab_engine = function (config) {
 
       //set the pattern-specific footer by compiling the general-footer with data, and then adding it to the meta footer
       var footerPartial = pattern_assembler.renderPattern(patternlab.footer, {
-        isPattern: pattern.isPattern,
+        isPattern: true,
         patternData: pattern.patternData,
         cacheBuster: patternlab.cacheBuster
       });
@@ -356,8 +342,6 @@ var patternlab_engine = function (config) {
 
       //write the encoded version too
       fs.outputFileSync(paths.public.patterns + pattern.patternLink.replace('.html', '.markup-only.html'), pattern.patternPartialCode);
-
-      return true;
     });
 
     //export patterns if necessary
